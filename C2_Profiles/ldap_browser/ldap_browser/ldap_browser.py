@@ -114,7 +114,7 @@ class LdapBrowser(CustomBrowser):
             ColumnType=CustomBrowserTableColumnType.String
         ),
         CustomBrowserTableColumn(
-            Key="display_name",
+            Key="cn",
             Name="Display",
             FillWidth=True,
             Width=160,
@@ -144,7 +144,7 @@ class LdapBrowser(CustomBrowser):
             ColumnType=CustomBrowserTableColumnType.String
         ),
         CustomBrowserTableColumn(
-            Key="dn",
+            Key="DistinguishedName",
             Name="DN",
             FillWidth=True,
             Width=360,
