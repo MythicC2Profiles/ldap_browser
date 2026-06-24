@@ -9,6 +9,18 @@ from bhopengraph.Edge import Edge
 from bhopengraph.Properties import Properties
 
 
+def _split_metadata_list(value):
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str) and " | " in value:
+        return [v.strip() for v in value.split(" | ") if v.strip()]
+    return [value] if value else []
+
+def _has_objectclass(metadata, cls):
+    if 'objectclass' not in metadata:
+        return False
+    return cls.lower() in [c.lower() for c in _split_metadata_list(metadata['objectclass'])]
+
 async def export_ldap_browser(self, message: ExportFunctionMessage) -> ExportFunctionMessageResponse:
     print(f"incoming export request: {message.to_json()}")
     return ExportFunctionMessageResponse(Success=True, CompletionMessage="Planned future support for BloodHound OpenGraph.\nIf interested, help out :)")
@@ -28,15 +40,15 @@ async def export_ldap_browser(self, message: ExportFunctionMessage) -> ExportFun
         for x in mythicTree.CustomBrowser:
             if 'objectsid' in x.Metadata:
                 kinds = ["ADBase"]
-                if 'objectclass' in x.Metadata and "computer" in x.Metadata['objectclass']:
+                if _has_objectclass(x.Metadata, "computer"):
                     kinds.append("Computer")
-                elif 'objectclass' in x.Metadata and "user" in x.Metadata['objectclass']:
+                elif _has_objectclass(x.Metadata, "user"):
                     kinds.append("User")
-                elif 'objectclass' in x.Metadata and "group" in x.Metadata['objectclass']:
+                elif _has_objectclass(x.Metadata, "group"):
                     kinds.append("Group")
-                elif 'objectclass' in x.Metadata and "organizationalUnit" in x.Metadata['objectclass']:
+                elif _has_objectclass(x.Metadata, "organizationalUnit"):
                     kinds.append("OU")
-                elif 'objectclass' in x.Metadata and "domain" in x.Metadata['objectclass']:
+                elif _has_objectclass(x.Metadata, "domain"):
                     kinds.append("Domain")
                 graph.add_node(Node(
                     id=x.Metadata['objectsid'],
@@ -50,7 +62,7 @@ async def export_ldap_browser(self, message: ExportFunctionMessage) -> ExportFun
         # now to create edges
         for x in mythicTree.CustomBrowser:
             if 'memberof' in x.Metadata and 'objectsid' in x.Metadata:
-                for member in x.Metadata['memberof']:
+                for member in _split_metadata_list(x.Metadata['memberof']):
                     if member in distinguishedNameMap:
                         graph.add_edge(Edge(
                             kind="MemberOf",
@@ -58,7 +70,7 @@ async def export_ldap_browser(self, message: ExportFunctionMessage) -> ExportFun
                             end_node=distinguishedNameMap[member],
                         ))
             if 'member' in x.Metadata and 'objectsid' in x.Metadata:
-                for member in x.Metadata['member']:
+                for member in _split_metadata_list(x.Metadata['member']):
                     if member in distinguishedNameMap:
                         graph.add_edge(Edge(
                             kind="MemberOf",
@@ -104,10 +116,30 @@ class LdapBrowser(CustomBrowser):
     ]
     columns = [
         CustomBrowserTableColumn(
+            Key="ldap_type",
+            Name="Type",
+            FillWidth=False,
+            Width=90,
+            DisableSort=False,
+            DisableFilterMenu=False,
+            DisableDoubleClick=False,
+            ColumnType=CustomBrowserTableColumnType.String
+        ),
+        CustomBrowserTableColumn(
+            Key="cn",
+            Name="Display",
+            FillWidth=True,
+            Width=160,
+            DisableSort=False,
+            DisableFilterMenu=False,
+            DisableDoubleClick=False,
+            ColumnType=CustomBrowserTableColumnType.String
+        ),
+        CustomBrowserTableColumn(
             Key="samaccountname",
             Name="Account",
-            FillWidth=True,
-            Width=100,
+            FillWidth=False,
+            Width=140,
             DisableSort=False,
             DisableFilterMenu=False,
             DisableDoubleClick=False,
@@ -117,7 +149,17 @@ class LdapBrowser(CustomBrowser):
             Key="description",
             Name="Description",
             FillWidth=True,
-            Width=100,
+            Width=220,
+            DisableSort=False,
+            DisableFilterMenu=False,
+            DisableDoubleClick=False,
+            ColumnType=CustomBrowserTableColumnType.String
+        ),
+        CustomBrowserTableColumn(
+            Key="DistinguishedName",
+            Name="DN",
+            FillWidth=True,
+            Width=360,
             DisableSort=False,
             DisableFilterMenu=False,
             DisableDoubleClick=False,
@@ -125,7 +167,7 @@ class LdapBrowser(CustomBrowser):
         )
     ]
     default_visible_columns = [
-        "Account", "Description"
+        "Type", "Display", "Account", "Description", "DN"
     ]
     extra_table_inputs = [
         CustomBrowserExtraTableTaskingInput(
